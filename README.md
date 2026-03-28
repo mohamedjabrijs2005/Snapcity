@@ -32,6 +32,7 @@ Upload a photo. Our AI agent instantly identifies the problem, estimates its sev
 
 ### 📋 Complaint Management
 - **🎫 Unique Complaint ID** — Every report gets a trackable reference number
+- **🔎 Token ID Tracking** — Paste your unique token into the dashboard search bar to instantly isolate and track your specific report
 - **🔄 Status Tracking** — Real-time updates: Pending → Under Review → In Progress → Resolved
 - **🗂️ Complaint History** — Full personal dashboard of all past submissions
 - **🔔 Email Notifications** — Alerts when complaint status changes
@@ -150,7 +151,7 @@ Open `http://localhost:3000` in your browser.
 **Step 2 — Auto Location:** The browser will auto-detect GPS coordinates and resolve the street name.  
 **Step 3 — AI Analysis:** Within seconds, Gemini detects the issue, severity, department, and generates a formal complaint letter.  
 **Step 4 — Review & Submit:** Review the letter, click Submit, and wait for your Trackable Token ID.  
-**Step 5 — Track:** Check your email for confirmation and view the real-time status in your Citizen Dashboard.  
+**Step 5 — Track by Token:** Go to your Citizen Dashboard (*My Reports*), paste your **Token ID** in the new Search Bar, and securely monitor live status updates and admin feedback.  
 
 ### For Municipal Officers
 Log in to the **Admin Dashboard** to view all generated complaints routed to your specific department. Click **"AI Draft"** to instantly formulate a professional response for dispatch.
