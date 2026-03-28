@@ -166,8 +166,13 @@ ${strictRules}`;
       try {
         response = await ai.models.generateContent({ model: 'gemini-2.0-flash', ...requestConfig });
       } catch (err: any) {
-        console.warn('API Error encountered. Using seamless Hackathon Mock Fallback.', err.message);
-        response = { text: JSON.stringify({ isValid: true, description: "Observed a civic infrastructure issue requiring immediate municipal attention.", invalidReason: null }) };
+        const msg = err.message || '';
+        if (msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
+          toast.error('Rate limit reached. Please wait 60 seconds and try again.');
+        } else {
+          toast.error(`AI Error: ${msg.substring(0, 80) || 'Failed to connect to Gemini'}`);
+        }
+        return;
       }
 
       if (response.text) {
