@@ -18,6 +18,7 @@ export default function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const demoFileInputRef = useRef<HTMLInputElement>(null);
 
   const [image, setImage] = useState<string | null>(null);
   const [location, setLocation] = useState('');
@@ -44,13 +45,14 @@ export default function Home() {
   };
 
   // Handle image upload and compress to base64
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isDemoUpload: boolean = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image is too large. Please select an image under 5MB.');
       if (fileInputRef.current) fileInputRef.current.value = '';
+      if (demoFileInputRef.current) demoFileInputRef.current.value = '';
       return;
     }
 
@@ -61,19 +63,28 @@ export default function Home() {
       const make = tags['Make']?.description;
       const model = tags['Model']?.description;
 
-      // DEMO BYPASS: Allow missing hardware metadata for demonstration purposes
-      if (!dateTime && !make) {
-        toast.success('Demo Mode: Downloaded image accepted.');
+      if (!isDemoUpload) {
+        if (!dateTime && !make) {
+          toast.error('Invalid Image: This image lacks verifiable EXIF hardware metadata. Please upload a live photograph from your device camera, or use the "Demo Upload" mode for downloaded testing images.');
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+      } else {
+        toast.success('Demo Mode: Hardware verification bypassed.');
       }
 
       setImageMetadata({
-        dateTime: dateTime,
-        make: make,
-        model: model
+        dateTime: dateTime || 'Demo Image (No Metadata)',
+        make: make || 'Unknown Source',
+        model: model || ''
       });
     } catch (exifError) {
-      console.warn("EXIF error or missing headers:", exifError);
-      // DEMO BYPASS: Allow missing headers
+      if (!isDemoUpload) {
+        console.warn("EXIF Error:", exifError);
+        toast.error('Security Verification Failed: The photo does not contain hardware metadata and cannot be verified as authentic. Please use "Demo Upload" mode for downloaded testing images.');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
       setImageMetadata({
         dateTime: 'Demo Image (No Metadata)',
         make: 'Unknown Source',
@@ -106,14 +117,14 @@ export default function Home() {
         // Compress heavily to fit in Firestore document (< 1MB)
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
         setImage(compressedBase64);
-        analyzeImage(compressedBase64);
+        analyzeImage(compressedBase64, isDemoUpload);
       };
       img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
   };
 
-  const analyzeImage = async (base64String: string) => {
+  const analyzeImage = async (base64String: string, isDemoUpload: boolean = false) => {
     setIsAnalyzingImage(true);
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -125,6 +136,10 @@ export default function Home() {
       const base64Data = base64String.split(',')[1];
       const mimeType = base64String.split(';')[0].split(':')[1];
 
+      const strictRules = isDemoUpload
+        ? `1. For DEMO PURPOSES, ALWAYS accept screenshots, downloaded images, stock photos, or images with visible UI elements, as long as a civic issue is clearly visible.\n2. Only reject images if they are completely blank, contain strictly memes, or have absolutely no relation to a public issue.`
+        : `1. STRICT AUTHENTICITY: Determine if this image is a genuine, unedited photograph of a real-world civic issue.\n2. REJECT screenshots, stock photos, obvious AI generations, memes, or images with text/UI overlays.\n3. Only accept images that look like raw camera photos taken by a regular user outside on the street.`;
+
       // Enhanced prompt: validates authenticity AND describes issue
       let response;
       const requestConfig = {
@@ -135,13 +150,12 @@ export default function Home() {
               text: `Analyze this image extremely strictly. Return JSON only:
 {
   "isValid": boolean,  // true ONLY if this is a real, live photo of a public civic issue taken out in the real world.
-  "invalidReason": "string or null",  // if isValid=false, explain why.
+  "invalidReason": "string or null",  // if isValid=false, explain exactly why based on the rules.
   "description": "string or null"  // 1-2 sentences describing the real-world civic issue if valid
 }
 Civic issues include: potholes, road damage, garbage, flooding, broken infrastructure, drain blockage, illegal dumping, streetlight failure, etc.
 IMPORTANT RULES:
-1. For DEMO PURPOSES, ALWAYS accept screenshots, downloaded images, stock photos, or images with visible UI elements, as long as a civic issue is clearly visible.
-2. Only reject images if they are completely blank, contain strictly memes, or have absolutely no relation to a public issue.`
+${strictRules}`
             }
           ]
         },
@@ -627,65 +641,89 @@ Important Rules:
           </CardDescription>
         </div>
         <CardContent className="space-y-8 p-8">
-          {/* Image Upload */}
+          {/* Image Upload Area */}
           <div className="space-y-3">
             <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Issue Photo</label>
-            <div 
-              className={`flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed p-8 transition-all duration-300 ${
-                image ? 'border-violet-500 bg-violet-50/50' : 'border-violet-200 bg-violet-50/30 hover:bg-violet-50 hover:border-violet-400'
-              }`}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                ref={fileInputRef}
-                onChange={handleImageUpload}
-              />
-              {image ? (
+            
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={(e) => handleImageUpload(e, false)}
+            />
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              ref={demoFileInputRef}
+              onChange={(e) => handleImageUpload(e, true)}
+            />
+
+            {image ? (
+              <div 
+                className="flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed p-8 transition-all duration-300 border-violet-500 bg-violet-50/50"
+                onClick={() => demoFileInputRef.current?.click()}
+              >
                 <div className="relative w-full max-w-sm overflow-hidden rounded-md">
                   <img src={image} alt="Preview" className="h-auto w-full object-cover" />
                   <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity hover:opacity-100 rounded-2xl backdrop-blur-sm">
                     <p className="text-sm font-bold text-white tracking-wide">Click to change</p>
                   </div>
                 </div>
-              ) : (
-                <div className="text-center">
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm mb-4">
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                {/* STRICT LIVE UPLOAD */}
+                <div 
+                  className="group flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-transparent bg-violet-600 p-8 shadow-md hover:bg-violet-700 transition-all duration-300 text-white hover:scale-[1.02]"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/20 shadow-inner mb-4 transition-transform group-hover:scale-110">
+                    <ImageIcon className="h-8 w-8 text-white" />
+                  </div>
+                  <p className="mt-2 text-base font-black text-center leading-tight tracking-wide">Authentic Camera Scan</p>
+                  <p className="text-xs text-violet-200 mt-2 text-center font-medium max-w-[200px]">Strictly verifies hardware camera metadata (For real citizens)</p>
+                </div>
+
+                {/* DEMO UPLOAD */}
+                <div 
+                  className="group flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-violet-200 bg-violet-50/30 p-8 hover:bg-violet-50 hover:border-violet-400 transition-all duration-300"
+                  onClick={() => demoFileInputRef.current?.click()}
+                >
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm border border-slate-100 mb-4 transition-transform group-hover:scale-110">
                     <ImageIcon className="h-8 w-8 text-violet-400" />
                   </div>
-                  <p className="mt-2 text-base font-semibold text-slate-700">Click to upload an image</p>
-                  <p className="text-sm text-slate-500 mt-1">PNG, JPG up to 5MB</p>
+                  <p className="mt-2 text-base font-bold text-slate-700 text-center leading-tight">Demo Upload Mode</p>
+                  <p className="text-xs text-slate-500 mt-2 text-center max-w-[200px]">Bypass metadata checks for screenshots or downloaded files</p>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* EXIF Display UI */}
             {image && imageMetadata && (
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center bg-violet-50/50 p-4 rounded-2xl border border-violet-100 shadow-sm mt-3 animate-in fade-in slide-in-from-top-4 duration-500">
                 <div className="flex items-center gap-2 text-violet-700">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <span className="text-sm font-bold uppercase tracking-wider">Hardware Verified</span>
-                </div>
-                <div className="w-px h-6 bg-violet-200 hidden sm:block"></div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Camera Timestamp</span>
-                  <span className="text-sm font-black text-slate-800 tracking-wide">{imageMetadata.dateTime || 'Original Hardware'}</span>
-                </div>
-                {imageMetadata.make && (
-                  <>
-                    <div className="w-px h-6 bg-violet-200 hidden sm:block"></div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Device Make</span>
-                      <span className="text-sm font-black text-slate-800 tracking-wide">{imageMetadata.make} {imageMetadata.model ? imageMetadata.model : ''}</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
+                   <CheckCircle2 className="h-5 w-5" />
+                   <span className="text-sm font-bold uppercase tracking-wider">Hardware Verified</span>
+                 </div>
+                 <div className="w-px h-6 bg-violet-200 hidden sm:block"></div>
+                 <div className="flex flex-col">
+                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Camera Timestamp</span>
+                   <span className="text-sm font-black text-slate-800 tracking-wide">{imageMetadata.dateTime || 'Original Hardware'}</span>
+                 </div>
+                 {imageMetadata.make && (
+                   <>
+                     <div className="w-px h-6 bg-violet-200 hidden sm:block"></div>
+                     <div className="flex flex-col">
+                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Device Make</span>
+                       <span className="text-sm font-black text-slate-800 tracking-wide">{imageMetadata.make} {imageMetadata.model ? imageMetadata.model : ''}</span>
+                     </div>
+                   </>
+                 )}
+               </div>
+             )}
           </div>
 
           {/* Location */}
