@@ -139,10 +139,10 @@ export default function IssueMap() {
             
             return (
               <Marker key={report.id} position={[report.lat, report.lng]}>
-                <Popup className="rounded-xl overflow-hidden">
-                  <div className="w-64 -m-3">
+                <Popup>
+                  <div className="w-60 flex flex-col font-sans">
                     {report.imageUrl && (
-                      <div className="h-32 w-full overflow-hidden">
+                      <div className="h-32 w-full overflow-hidden rounded-t-lg mb-2">
                         <img 
                           src={report.imageUrl} 
                           alt="Issue" 
@@ -151,8 +151,8 @@ export default function IssueMap() {
                         />
                       </div>
                     )}
-                    <div className="p-4">
-                      <div className="flex items-center gap-2 mb-2">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         {isCompleted ? (
                           <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
                             <CheckCircle2 className="h-3 w-3" /> {report.status}
@@ -169,16 +169,16 @@ export default function IssueMap() {
                         )}
                       </div>
                       
-                      <h3 className="font-bold text-slate-800 text-sm line-clamp-2 mb-1">
+                      <h3 className="font-bold text-slate-800 text-sm leading-tight line-clamp-2">
                         {report.description}
                       </h3>
                       
-                      <div className="flex items-start gap-1.5 text-xs text-slate-500 mb-2">
+                      <div className="flex items-start gap-1.5 text-xs text-slate-500">
                         <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                         <span className="line-clamp-2">{report.location}</span>
                       </div>
                       
-                      <div className="text-[10px] text-slate-400 border-t border-slate-100 pt-2 mt-2">
+                      <div className="text-[10px] font-medium text-slate-400 border-t border-slate-100 pt-2 mt-1">
                         Reported on {report.createdAt?.toDate ? format(report.createdAt.toDate(), 'MMM d, yyyy') : 'Recently'}
                       </div>
                     </div>
