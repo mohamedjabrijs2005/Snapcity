@@ -143,7 +143,7 @@ export default function Reports() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-800 border-t-transparent"></div>
       </div>
     );
   }
@@ -227,7 +227,7 @@ export default function Reports() {
                       <CheckCircle2 className="h-3.5 w-3.5" /> {report.status}
                     </span>
                   ) : report.status.toLowerCase().includes('progress') ? (
-                    <span className="flex items-center gap-1.5 rounded-full bg-blue-500/90 backdrop-blur-md px-3 py-1.5 text-xs font-bold text-white shadow-sm">
+                    <span className="flex items-center gap-1.5 rounded-full bg-slate-800/90 backdrop-blur-md px-3 py-1.5 text-xs font-bold text-white shadow-sm">
                       <Clock className="h-3.5 w-3.5" /> {report.status}
                     </span>
                   ) : (
@@ -276,14 +276,14 @@ export default function Reports() {
                 </div>
                 
                 {report.adminFeedback && (
-                  <div className={`mt-4 rounded-xl p-3 border ${isCompleted ? 'bg-emerald-50 border-emerald-100' : 'bg-blue-50 border-blue-100'}`}>
+                  <div className={`mt-4 rounded-xl p-3 border ${isCompleted ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-200'}`}>
                     <div className="flex items-center gap-1.5 mb-1.5">
-                      <MessageSquare className={`h-3.5 w-3.5 ${isCompleted ? 'text-emerald-600' : 'text-blue-600'}`} />
-                      <span className={`text-xs font-bold uppercase tracking-wider ${isCompleted ? 'text-emerald-800' : 'text-blue-800'}`}>
+                      <MessageSquare className={`h-3.5 w-3.5 ${isCompleted ? 'text-emerald-600' : 'text-slate-800'}`} />
+                      <span className={`text-xs font-bold uppercase tracking-wider ${isCompleted ? 'text-emerald-800' : 'text-slate-800'}`}>
                         Department Response
                       </span>
                     </div>
-                    <p className={`text-sm ${isCompleted ? 'text-emerald-700' : 'text-blue-700'}`}>
+                    <p className={`text-sm ${isCompleted ? 'text-emerald-700' : 'text-slate-800'}`}>
                       {report.adminFeedback}
                     </p>
                   </div>
@@ -328,7 +328,7 @@ export default function Reports() {
                       variant="ghost" 
                       size="sm" 
                       onClick={() => handleShare(report)}
-                      className="h-8 px-2 text-xs text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                      className="h-8 px-2 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100"
                     >
                       <Share2 className="h-3.5 w-3.5" />
                     </Button>
