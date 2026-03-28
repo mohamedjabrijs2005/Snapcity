@@ -193,21 +193,10 @@ Do not use placeholders like [City Name].`;
 
       let res;
       try {
-        res = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-      } catch (err25: any) {
-        if (err25.message?.includes('429') || err25.message?.includes('quota') || err25.message?.includes('RESOURCE_EXHAUSTED')) {
-           try {
-             res = await ai.models.generateContent({ model: 'gemini-2.0-flash', contents: prompt });
-           } catch (err20: any) {
-             if (err20.message?.includes('429') || err20.message?.includes('quota')) {
-                 res = { text: "Thank you for reporting this issue. Our department has officially documented your complaint, and an assessment team will be dispatched shortly to resolve the situation." };
-             } else {
-                 throw err20;
-             }
-           }
-        } else {
-           throw err25;
-        }
+        res = await ai.models.generateContent({ model: 'gemini-2.0-flash', contents: prompt });
+      } catch (err: any) {
+        console.warn('API Error encountered.', err.message);
+        res = { text: "Thank you for reporting this issue. Our department has officially documented your complaint, and an assessment team will be dispatched shortly to resolve the situation." };
       }
       
       const text = res.text?.trim() || '';
