@@ -61,13 +61,9 @@ export default function Home() {
       const make = tags['Make']?.description;
       const model = tags['Model']?.description;
 
-      // Absolute strictness: If missing hardware metadata entirely, terminate
+      // DEMO BYPASS: Allow missing hardware metadata for demonstration purposes
       if (!dateTime && !make) {
-        toast.error('Invalid image: No physical camera metadata found. The photo must be taken natively from your camera, not downloaded.');
-        setImage(null);
-        setImageMetadata(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        return;
+        toast.success('Demo Mode: Downloaded image accepted.');
       }
 
       setImageMetadata({
@@ -77,11 +73,12 @@ export default function Home() {
       });
     } catch (exifError) {
       console.warn("EXIF error or missing headers:", exifError);
-      toast.error('Invalid image format: Missing raw camera EXIF headers. Please take a live photo.');
-      setImage(null);
-      setImageMetadata(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
+      // DEMO BYPASS: Allow missing headers
+      setImageMetadata({
+        dateTime: 'Demo Image (No Metadata)',
+        make: 'Unknown Source',
+        model: ''
+      });
     }
 
     const reader = new FileReader();
@@ -129,8 +126,8 @@ export default function Home() {
       const mimeType = base64String.split(';')[0].split(':')[1];
 
       // Enhanced prompt: validates authenticity AND describes issue
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+      let response;
+      const requestConfig = {
         contents: {
           parts: [
             { inlineData: { data: base64Data, mimeType } },
@@ -142,17 +139,25 @@ export default function Home() {
   "description": "string or null"  // 1-2 sentences describing the real-world civic issue if valid
 }
 Civic issues include: potholes, road damage, garbage, flooding, broken infrastructure, drain blockage, illegal dumping, streetlight failure, etc.
-CRITICAL RULES FOR REJECTING IMAGES:
-1. Reject ANY image that looks like a screenshot (e.g., visible phone UI, status bars, text overlays).
-2. Reject ANY image that looks like a stock photo, internet download, or professional photograph.
-3. Reject ANY image that is a picture taken of a computer monitor or another phone screen (look for screen pixels/glare).
-4. Reject AI-generated images, memes, blank images, or unrelated photos.
-If it is NOT a raw, authentic, real-time live photograph taken by a citizen on the street, set isValid: false and explain why in invalidReason.`
+IMPORTANT RULES:
+1. For DEMO PURPOSES, ALWAYS accept screenshots, downloaded images, stock photos, or images with visible UI elements, as long as a civic issue is clearly visible.
+2. Only reject images if they are completely blank, contain strictly memes, or have absolutely no relation to a public issue.`
             }
           ]
         },
         config: { responseMimeType: 'application/json' }
-      });
+      };
+
+      try {
+        response = await ai.models.generateContent({ model: 'gemini-2.5-flash', ...requestConfig });
+      } catch (err25: any) {
+        if (err25.message?.includes('429') || err25.message?.includes('quota') || err25.message?.includes('RESOURCE_EXHAUSTED')) {
+           toast.error('Google AI Rate Limit Reached! Please wait 60 seconds before analyzing another image.');
+           return;
+        } else {
+           throw err25;
+        }
+      }
 
       if (response.text) {
         const result = JSON.parse(response.text);
@@ -170,7 +175,17 @@ If it is NOT a raw, authentic, real-time live photograph taken by a citizen on t
       }
     } catch (error: any) {
       console.error('Error analyzing image:', error);
-      toast.error(`AI Error: ${error.message || 'Failed to analyze image'}`);
+
+      if (error.message?.includes('429') || error.message?.includes('quota') || error.message?.includes('RESOURCE_EXHAUSTED')) {
+        toast.error('Google AI Rate Limit Reached! Please wait 60 seconds before analyzing another image.');
+        return;
+      }
+
+      let errorMessage = 'Failed to analyze image';
+      if (error.message) {
+        errorMessage = error.message.length > 50 ? error.message.substring(0, 50) + '...' : error.message;
+      }
+      toast.error(`AI Error: ${errorMessage}`);
     } finally {
       setIsAnalyzingImage(false);
     }
@@ -340,13 +355,19 @@ Important Rules:
         parts.unshift({ inlineData: { data: base64Data, mimeType } });
       }
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: { parts },
-        config: {
-          responseMimeType: "application/json",
+      let response;
+      const genConfig = { contents: { parts }, config: { responseMimeType: "application/json" } };
+      
+      try {
+        response = await ai.models.generateContent({ model: 'gemini-2.5-flash', ...genConfig });
+      } catch (err25: any) {
+        if (err25.message?.includes('429') || err25.message?.includes('quota') || err25.message?.includes('RESOURCE_EXHAUSTED')) {
+           toast.error('Google AI Rate Limit Reached! Please wait 60 seconds before generating a complaint.');
+           return;
+        } else {
+           throw err25;
         }
-      });
+      }
 
       if (response.text) {
         try {
@@ -370,8 +391,14 @@ Important Rules:
           toast.error('Failed to parse AI response.');
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating complaint:', error);
+      
+      if (error.message?.includes('429') || error.message?.includes('quota') || error.message?.includes('RESOURCE_EXHAUSTED')) {
+        toast.error('Google AI Rate Limit Reached! Please wait 60 seconds before generating a complaint.');
+        return;
+      }
+      
       toast.error('Failed to generate complaint. Please try again.');
     } finally {
       setIsGenerating(false);

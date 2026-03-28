@@ -181,22 +181,50 @@ export default function AdminDashboard() {
     setGeneratingFeedback(report.id);
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) { toast.error('Add VITE_GEMINI_API_KEY to .env!'); return; }
+      if (!apiKey) { toast.error('Add VITE_GEMINI_API_KEY to .env!'); setGeneratingFeedback(null); return; }
       const ai = new GoogleGenAI({ apiKey });
-      const res = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `You are a professional city official. Write a 1-2 sentence professional and empathetic response to a citizen's civic complaint.
-Issue: ${report.description}
-Location: ${report.location}
-Department: ${report.department}
-Severity: ${report.severity}
-Do not use placeholders like [City Name].`
-      });
+      
+      const prompt = `You are a professional city official. Write a 1-2 sentence professional and empathetic response to a citizen's civic complaint.
+Issue: ${report.description || 'Unspecified'}
+Location: ${report.location || 'Unspecified'}
+Department: ${report.department || 'General'}
+Severity: ${report.severity || 'Unknown'}
+Do not use placeholders like [City Name].`;
+
+      let res;
+      try {
+        res = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+      } catch (err25: any) {
+        if (err25.message?.includes('429') || err25.message?.includes('quota') || err25.message?.includes('RESOURCE_EXHAUSTED')) {
+           toast.error('Google AI Rate Limit Reached! Please wait 60 seconds before generating feedback.');
+           return;
+        } else {
+           throw err25;
+        }
+      }
+      
       const text = res.text?.trim() || '';
-      if (text) { setFeedbacks(p => ({ ...p, [report.id]: text })); toast.success('AI feedback generated!'); }
-      else toast.error('Failed to generate feedback');
-    } catch (e) { toast.error('AI feedback error'); }
-    finally { setGeneratingFeedback(null); }
+      if (text) { 
+        setFeedbacks(p => ({ ...p, [report.id]: text })); 
+        toast.success('AI feedback generated!'); 
+      } else {
+        toast.error('Failed to generate feedback: Empty response');
+      }
+    } catch (e: any) { 
+      console.error('Feedback Error:', e);
+      let errorMessage = 'Failed to connect to Gemini';
+      
+      if (e.message?.includes('429') || e.message?.includes('quota') || e.message?.includes('RESOURCE_EXHAUSTED')) {
+        toast.error('Google AI Rate Limit Reached! Please wait 60 seconds before generating feedback.');
+        return;
+      } else if (e.message) {
+        errorMessage = e.message.length > 50 ? e.message.substring(0, 50) + '...' : e.message;
+      }
+      
+      toast.error(`AI Error: ${errorMessage}`); 
+    } finally { 
+      setGeneratingFeedback(null); 
+    }
   };
 
   // ── Filtering ──
