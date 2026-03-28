@@ -1,9 +1,9 @@
 import toast from 'react-hot-toast';
 
 // Always resolve the API base relative to where the React app is served from.
-// This works whether you're using `npm run dev` (Vite proxy) OR `node server.js`
-// (Express static + API on the same port).
-const API_BASE = typeof window !== 'undefined' ? window.location.origin : '';
+// In Vercel (PROD), it is empty string so it hits the serverless /api/ directory relatively.
+// In local dev, it hits the Express server on port 3001.
+const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:3001';
 
 /**
  * Sends a status update email to the citizen when admin changes report status.

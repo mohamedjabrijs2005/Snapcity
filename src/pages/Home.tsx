@@ -501,8 +501,8 @@ Important Rules:
         localStorage.setItem('demo_reports', JSON.stringify([newReport, ...existingReports]));
       }
 
-      // 2. Send Email directly via backend Express Server
-      const apiBase = window.location.origin;
+      // 2. Send Email directly via backend Express Server (or Vercel Serverless)
+      const apiBase = import.meta.env.PROD ? '' : 'http://localhost:3001';
       try {
         await fetch(`${apiBase}/api/send-email`, {
           method: 'POST',

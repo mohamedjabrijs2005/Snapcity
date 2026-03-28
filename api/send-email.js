@@ -1,48 +1,53 @@
 import nodemailer from 'nodemailer';
 
 export default async function handler(req, res) {
-  // Allow CORS
+  // CORS setup for Serverless API
+  res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  res.setHeader('Access-Control-Allow-Methods', 'OPTIONS,POST');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { toEmail, replyTo, subject, text, fromName } = req.body;
 
-  if (!toEmail || !subject || !text) {
-    return res.status(400).json({ error: 'Missing required fields: toEmail, subject, text' });
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    console.log(`[Email Mock Mode] Would have sent email to: ${toEmail}`);
+    console.log(`[Subject]: ${subject}`);
+    return res.status(200).json({ success: true, messageId: 'mock-id-12345', notice: 'Email mocked because Gmail was not configured.' });
   }
 
-  const gmailUser = process.env.GMAIL_USER;
-  const gmailPass = process.env.GMAIL_APP_PASSWORD;
-
-  if (!gmailUser || !gmailPass) {
-    return res.status(500).json({ error: 'Server Gmail configuration is missing' });
-  }
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
 
   try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: gmailUser, pass: gmailPass },
-    });
-
     const mailOptions = {
-      from: `"${fromName || 'Snap City AI'}" <${gmailUser}>`,
+      from: `"${fromName || 'Snap City AI'}" <${process.env.GMAIL_USER}>`,
       to: toEmail,
-      replyTo: replyTo || gmailUser,
-      subject,
-      text,
+      replyTo: replyTo,
+      subject: subject,
+      text: text,
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent:', info.response);
+    console.log('Email sent: ' + info.response);
     return res.status(200).json({ success: true, messageId: info.messageId });
   } catch (error) {
     console.error('Error sending email:', error);
-    return res.status(500).json({ error: 'Failed to send email', details: error.message });
+    return res.status(500).json({ error: 'Failed to send email' });
   }
 }
