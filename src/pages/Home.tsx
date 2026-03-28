@@ -142,23 +142,24 @@ export default function Home() {
 
       // Enhanced prompt: validates authenticity AND describes issue
       let response;
-      const requestConfig = {
-        contents: {
-          parts: [
-            { inlineData: { data: base64Data, mimeType } },
-            {
-              text: `Analyze this image extremely strictly. Return JSON only:
+      const validationText = `Analyze this image extremely strictly. Return JSON only:
 {
-  "isValid": boolean,  // true ONLY if this is a real, live photo of a public civic issue taken out in the real world.
-  "invalidReason": "string or null",  // if isValid=false, explain exactly why based on the rules.
-  "description": "string or null"  // 1-2 sentences describing the real-world civic issue if valid
+  "isValid": boolean,
+  "invalidReason": "string or null",
+  "description": "string or null"
 }
 Civic issues include: potholes, road damage, garbage, flooding, broken infrastructure, drain blockage, illegal dumping, streetlight failure, etc.
 IMPORTANT RULES:
-${strictRules}`
-            }
+${strictRules}`;
+
+      const requestConfig = {
+        contents: [{
+          role: 'user',
+          parts: [
+            { inlineData: { data: base64Data, mimeType } },
+            { text: validationText }
           ]
-        },
+        }],
         config: { responseMimeType: 'application/json' }
       };
 
@@ -356,33 +357,28 @@ Important Rules:
 - Ensure severity reflects real-world urgency
 - Confidence must NOT be 100% (keep realistic)`;
 
-      const parts: any[] = [{ text: prompt }];
+      const contentParts: any[] = [{ text: prompt }];
       
-      // Include image for moderation if available
+      // Include image for real AI analysis
       if (image) {
         const base64Data = image.split(',')[1];
         const mimeType = image.split(';')[0].split(':')[1];
-        parts.unshift({ inlineData: { data: base64Data, mimeType } });
+        contentParts.unshift({ inlineData: { data: base64Data, mimeType } });
       }
 
       let response;
-      const genConfig = { contents: { parts }, config: { responseMimeType: "application/json" } };
+      const genConfig = {
+        contents: [{ role: 'user', parts: contentParts }],
+        config: { responseMimeType: 'application/json' }
+      };
       
       try {
         response = await ai.models.generateContent({ model: 'gemini-2.0-flash', ...genConfig });
       } catch (err: any) {
-        console.warn('API Error encountered. Using seamless Hackathon Mock Fallback.', err.message);
-        response = { text: JSON.stringify({
-          complaint: "Dear Municipal Officer,\n\nI am writing to formally report an infrastructure issue observed at the designated location. The situation poses a potential hazard to public safety and requires timely assessment and remediation by the concerned engineering or sanitation department.\n\nKindly dispatch a team to evaluate and resolve this matter at your earliest convenience.",
-          issueType: "Civic Infrastructure",
-          severity: "Medium",
-          department: "Public Works / Engineering",
-          confidence: 85,
-          recommendedAction: "Dispatch evaluation team to the location.",
-          status: "Pending (Awaiting Department Action)",
-          assignedCity: "Chennai",
-          isAppropriate: true
-        }) };
+        console.error('Gemini API Error:', err.message);
+        toast.error(`AI Error: ${err.message?.substring(0, 80) || 'Failed to connect'}`);
+        setIsGenerating(false);
+        return;
       }
 
       if (response.text) {
