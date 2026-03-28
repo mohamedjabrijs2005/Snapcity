@@ -299,23 +299,21 @@ export default function Reports() {
                     <p className="text-xs font-medium text-slate-500 truncate">Reported by <span className="text-slate-700">{report.userEmail.split('@')[0]}</span></p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {user && report.userId === user.uid && (
-                      confirmDeleteId === report.id ? (
-                        <div className="flex items-center gap-1 bg-rose-50 rounded-lg p-1 border border-rose-100">
-                          <Button variant="destructive" size="sm" className="h-6 px-2 text-[10px]" onClick={() => handleDelete(report.id)}>Confirm</Button>
-                          <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] text-slate-500 hover:text-slate-700" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
-                        </div>
-                      ) : (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => setConfirmDeleteId(report.id)}
-                          className="h-8 px-2 text-xs text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                          title="Delete Report"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )
+                    {confirmDeleteId === report.id ? (
+                      <div className="flex items-center gap-1 bg-rose-50 rounded-lg p-1 border border-rose-100">
+                        <Button variant="destructive" size="sm" className="h-6 px-2 text-[10px]" onClick={() => handleDelete(report.id)}>Confirm</Button>
+                        <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] text-slate-500 hover:text-slate-700" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+                      </div>
+                    ) : (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setConfirmDeleteId(report.id)}
+                        className="h-8 px-2 text-xs text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                        title="Delete Report"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     )}
                     <Button 
                       variant="ghost" 
