@@ -3,7 +3,8 @@ import { db } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, CheckCircle2, Clock3, FileText, ImageIcon, ThumbsUp, Share2, AlertCircle, MessageSquare, Trash2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { MapPin, Clock, CheckCircle2, Clock3, FileText, ImageIcon, ThumbsUp, Share2, AlertCircle, MessageSquare, Trash2, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +31,7 @@ export default function Reports() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const isDemoMode = user?.uid.startsWith('demo-');
@@ -166,6 +168,19 @@ export default function Reports() {
         </p>
       </div>
 
+      <div className="mb-10 max-w-xl mx-auto">
+        <div className="relative flex items-center">
+          <Search className="absolute left-4 text-slate-400 h-5 w-5" />
+          <Input 
+            type="text"
+            placeholder="Track your Token ID (e.g. SC-2026-...) or search descriptions"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-12 h-14 w-full rounded-full border-2 border-violet-100 bg-white/70 backdrop-blur-sm focus-visible:ring-violet-500 shadow-sm text-base"
+          />
+        </div>
+      </div>
+
       {reports.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-violet-200 bg-white/50 py-24 text-center backdrop-blur-sm shadow-sm">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-violet-100 mb-6">
@@ -176,7 +191,11 @@ export default function Reports() {
         </div>
       ) : (
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {reports.map((report) => {
+          {reports.filter(report => {
+            if (!searchQuery.trim()) return true;
+            const query = searchQuery.toLowerCase().trim();
+            return report.tokenId?.toLowerCase().includes(query) || report.description.toLowerCase().includes(query) || report.location.toLowerCase().includes(query);
+          }).map((report) => {
             const isCompleted = report.status.toLowerCase().includes('completed') || report.status.toLowerCase().includes('resolved');
             const upvotes = report.upvotes || [];
             const hasUpvoted = user ? upvotes.includes(user.uid) : false;
