@@ -196,8 +196,17 @@ Do not use placeholders like [City Name].`;
         res = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
       } catch (err25: any) {
         if (err25.message?.includes('429') || err25.message?.includes('quota') || err25.message?.includes('RESOURCE_EXHAUSTED')) {
-           toast.error('Google AI Rate Limit Reached! Please wait 60 seconds before generating feedback.');
-           return;
+           console.warn('gemini-2.5 rate limit hit, falling back to gemini-1.5-flash');
+           try {
+             res = await ai.models.generateContent({ model: 'gemini-1.5-flash', contents: prompt });
+           } catch (err15: any) {
+             if (err15.message?.includes('429') || err15.message?.includes('quota') || err15.message?.includes('RESOURCE_EXHAUSTED')) {
+               console.warn('gemini-1.5 rate limit hit, falling back to gemini-1.5-pro');
+               res = await ai.models.generateContent({ model: 'gemini-1.5-pro', contents: prompt });
+             } else {
+               throw err15;
+             }
+           }
         } else {
            throw err25;
         }

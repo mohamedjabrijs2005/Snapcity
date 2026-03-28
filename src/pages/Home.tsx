@@ -166,8 +166,17 @@ ${strictRules}`
         response = await ai.models.generateContent({ model: 'gemini-2.5-flash', ...requestConfig });
       } catch (err25: any) {
         if (err25.message?.includes('429') || err25.message?.includes('quota') || err25.message?.includes('RESOURCE_EXHAUSTED')) {
-           toast.error('Google AI Rate Limit Reached! Please wait 60 seconds before analyzing another image.');
-           return;
+           console.warn('gemini-2.5 rate limit hit, falling back to gemini-1.5-flash');
+           try {
+             response = await ai.models.generateContent({ model: 'gemini-1.5-flash', ...requestConfig });
+           } catch (err15: any) {
+             if (err15.message?.includes('429') || err15.message?.includes('quota') || err15.message?.includes('RESOURCE_EXHAUSTED')) {
+                console.warn('gemini-1.5 rate limit hit, falling back to gemini-1.5-pro');
+                response = await ai.models.generateContent({ model: 'gemini-1.5-pro', ...requestConfig });
+             } else {
+                throw err15;
+             }
+           }
         } else {
            throw err25;
         }
@@ -376,8 +385,17 @@ Important Rules:
         response = await ai.models.generateContent({ model: 'gemini-2.5-flash', ...genConfig });
       } catch (err25: any) {
         if (err25.message?.includes('429') || err25.message?.includes('quota') || err25.message?.includes('RESOURCE_EXHAUSTED')) {
-           toast.error('Google AI Rate Limit Reached! Please wait 60 seconds before generating a complaint.');
-           return;
+           console.warn('gemini-2.5 rate limit hit, falling back to gemini-1.5-flash');
+           try {
+             response = await ai.models.generateContent({ model: 'gemini-1.5-flash', ...genConfig });
+           } catch (err15: any) {
+             if (err15.message?.includes('429') || err15.message?.includes('quota') || err15.message?.includes('RESOURCE_EXHAUSTED')) {
+                console.warn('gemini-1.5 rate limit hit, falling back to gemini-1.5-pro');
+                response = await ai.models.generateContent({ model: 'gemini-1.5-pro', ...genConfig });
+             } else {
+                throw err15;
+             }
+           }
         } else {
            throw err25;
         }
