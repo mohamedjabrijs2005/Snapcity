@@ -50,6 +50,8 @@ export default function Home() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+  const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Unique token shown in success modal after report submission
   const [successToken, setSuccessToken] = useState<string | null>(null);
@@ -186,9 +188,20 @@ ${strictRules}`;
       } catch (err: any) {
         const is429 = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
         if (is429) {
-          // Rate limited — skip validation, accept image and let user continue
-          toast.success('Image accepted! Please describe the issue below.');
-          setDescription('');
+          // Auto-retry after 62 seconds with live countdown
+          setIsAnalyzingImage(false);
+          let secs = 62;
+          setRetryCountdown(secs);
+          retryTimerRef.current = setInterval(() => {
+            secs -= 1;
+            setRetryCountdown(secs);
+            if (secs <= 0) {
+              clearInterval(retryTimerRef.current!);
+              retryTimerRef.current = null;
+              setRetryCountdown(null);
+              analyzeImage(base64String, isDemoUpload);
+            }
+          }, 1000);
           return;
         }
         toast.error(`AI Error: ${err.message?.substring(0, 80) || 'Failed to connect'}`);
@@ -758,6 +771,20 @@ A Concerned Citizen
                   <p className="mt-2 text-base font-bold text-slate-700 text-center leading-tight">Demo Upload Mode</p>
                   <p className="text-xs text-slate-500 mt-2 text-center max-w-[200px]">Bypass metadata checks for screenshots or downloaded files</p>
                 </div>
+              </div>
+            )}
+
+            {/* AI Retry Countdown Banner */}
+            {retryCountdown !== null && (
+              <div className="mt-3 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 animate-in fade-in duration-300">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                  <Loader2 className="h-5 w-5 text-amber-600 animate-spin" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-amber-800">🤖 AI is warming up — retrying in {retryCountdown}s</p>
+                  <p className="text-xs text-amber-600 mt-0.5">Google AI rate limit reached. Automatically retrying your image analysis...</p>
+                </div>
+                <span className="text-2xl font-black text-amber-500 tabular-nums w-10 text-right">{retryCountdown}</span>
               </div>
             )}
 
