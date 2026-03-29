@@ -14,7 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { MapPin, Loader2, Send, Image as ImageIcon, Copy, CheckCircle2, X } from 'lucide-react';
 import ExifReader from 'exifreader';
 
-
 // ── Gemini helper: try multiple models, fail fast ──────────────────────────
 async function geminiCall(ai: any, config: any): Promise<any> {
   const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
@@ -24,12 +23,46 @@ async function geminiCall(ai: any, config: any): Promise<any> {
       return await ai.models.generateContent({ model, ...config });
     } catch (err: any) {
       lastErr = err;
-      // Only try next model on rate limit, otherwise throw immediately
       const is429 = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
       if (!is429) throw err;
     }
   }
   throw lastErr;
+}
+
+// ── Groq Vision fallback: instant real AI when Gemini is rate-limited ───────
+async function callGroqVision(base64Data: string, mimeType: string, prompt: string): Promise<string> {
+  const groqKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (!groqKey) throw new Error('No Groq API key');
+  
+  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${groqKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}` } },
+          { type: 'text', text: prompt }
+        ]
+      }],
+      response_format: { type: 'json_object' },
+      temperature: 0.1,
+      max_tokens: 512,
+    }),
+  });
+  
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Groq error ${resp.status}: ${err.substring(0, 100)}`);
+  }
+  
+  const data = await resp.json();
+  return data.choices?.[0]?.message?.content || '';
 }
 
 export default function Home() {
@@ -188,24 +221,34 @@ ${strictRules}`;
       } catch (err: any) {
         const is429 = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
         if (is429) {
-          // Auto-retry after 62 seconds with live countdown
-          setIsAnalyzingImage(false);
-          let secs = 62;
-          setRetryCountdown(secs);
-          retryTimerRef.current = setInterval(() => {
-            secs -= 1;
+          // Instantly fall back to Groq vision — separate quota, real AI, ~1-2s
+          try {
+            toast.loading('Switching to backup AI engine...', { id: 'groq-fallback', duration: 3000 });
+            const groqText = await callGroqVision(base64Data, mimeType, validationText);
+            toast.dismiss('groq-fallback');
+            response = { text: groqText };
+          } catch (groqErr: any) {
+            toast.dismiss('groq-fallback');
+            // Both AIs exhausted — show countdown and retry
+            setIsAnalyzingImage(false);
+            let secs = 62;
             setRetryCountdown(secs);
-            if (secs <= 0) {
-              clearInterval(retryTimerRef.current!);
-              retryTimerRef.current = null;
-              setRetryCountdown(null);
-              analyzeImage(base64String, isDemoUpload);
-            }
-          }, 1000);
+            retryTimerRef.current = setInterval(() => {
+              secs -= 1;
+              setRetryCountdown(secs);
+              if (secs <= 0) {
+                clearInterval(retryTimerRef.current!);
+                retryTimerRef.current = null;
+                setRetryCountdown(null);
+                analyzeImage(base64String, isDemoUpload);
+              }
+            }, 1000);
+            return;
+          }
+        } else {
+          toast.error(`AI Error: ${err.message?.substring(0, 80) || 'Failed to connect'}`);
           return;
         }
-        toast.error(`AI Error: ${err.message?.substring(0, 80) || 'Failed to connect'}`);
-        return;
       }
 
       if (response.text) {
