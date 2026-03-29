@@ -14,6 +14,33 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { MapPin, Loader2, Send, Image as ImageIcon, Copy, CheckCircle2, X } from 'lucide-react';
 import ExifReader from 'exifreader';
 
+// ── Gemini helper: auto-retry on rate-limit ────────────────────────────────
+const MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+
+async function geminiCall(ai: any, config: any, retries = 2): Promise<any> {
+  for (const model of MODELS) {
+    let attempt = 0;
+    while (attempt <= retries) {
+      try {
+        return await ai.models.generateContent({ model, ...config });
+      } catch (err: any) {
+        const is429 = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
+        if (is429 && attempt < retries) {
+          // wait 65 seconds silently then retry same model
+          await new Promise(r => setTimeout(r, 65000));
+          attempt++;
+        } else if (is429) {
+          // exhausted retries for this model — try next model
+          break;
+        } else {
+          throw err;
+        }
+      }
+    }
+  }
+  throw new Error('All Gemini models are rate-limited. Please try after a few minutes.');
+}
+
 export default function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -164,14 +191,10 @@ ${strictRules}`;
       };
 
       try {
-        response = await ai.models.generateContent({ model: 'gemini-2.0-flash', ...requestConfig });
+        response = await geminiCall(ai, requestConfig);
       } catch (err: any) {
         const msg = err.message || '';
-        if (msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
-          toast.error('Rate limit reached. Please wait 60 seconds and try again.');
-        } else {
-          toast.error(`AI Error: ${msg.substring(0, 80) || 'Failed to connect to Gemini'}`);
-        }
+        toast.error(msg.length > 80 ? msg.substring(0, 80) + '...' : msg);
         return;
       }
 
@@ -378,7 +401,7 @@ Important Rules:
       };
       
       try {
-        response = await ai.models.generateContent({ model: 'gemini-2.0-flash', ...genConfig });
+        response = await geminiCall(ai, genConfig);
       } catch (err: any) {
         console.error('Gemini API Error:', err.message);
         toast.error(`AI Error: ${err.message?.substring(0, 80) || 'Failed to connect'}`);
