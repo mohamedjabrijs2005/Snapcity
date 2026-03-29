@@ -14,31 +14,22 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { MapPin, Loader2, Send, Image as ImageIcon, Copy, CheckCircle2, X } from 'lucide-react';
 import ExifReader from 'exifreader';
 
-// ── Gemini helper: auto-retry on rate-limit ────────────────────────────────
-const MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
 
-async function geminiCall(ai: any, config: any, retries = 2): Promise<any> {
-  for (const model of MODELS) {
-    let attempt = 0;
-    while (attempt <= retries) {
-      try {
-        return await ai.models.generateContent({ model, ...config });
-      } catch (err: any) {
-        const is429 = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
-        if (is429 && attempt < retries) {
-          // wait 65 seconds silently then retry same model
-          await new Promise(r => setTimeout(r, 65000));
-          attempt++;
-        } else if (is429) {
-          // exhausted retries for this model — try next model
-          break;
-        } else {
-          throw err;
-        }
-      }
+// ── Gemini helper: try multiple models, fail fast ──────────────────────────
+async function geminiCall(ai: any, config: any): Promise<any> {
+  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+  let lastErr: any;
+  for (const model of models) {
+    try {
+      return await ai.models.generateContent({ model, ...config });
+    } catch (err: any) {
+      lastErr = err;
+      // Only try next model on rate limit, otherwise throw immediately
+      const is429 = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
+      if (!is429) throw err;
     }
   }
-  throw new Error('All Gemini models are rate-limited. Please try after a few minutes.');
+  throw lastErr;
 }
 
 export default function Home() {
@@ -193,8 +184,14 @@ ${strictRules}`;
       try {
         response = await geminiCall(ai, requestConfig);
       } catch (err: any) {
-        const msg = err.message || '';
-        toast.error(msg.length > 80 ? msg.substring(0, 80) + '...' : msg);
+        const is429 = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
+        if (is429) {
+          // Rate limited — skip validation, accept image and let user continue
+          toast.success('Image accepted! Please describe the issue below.');
+          setDescription('');
+          return;
+        }
+        toast.error(`AI Error: ${err.message?.substring(0, 80) || 'Failed to connect'}`);
         return;
       }
 
